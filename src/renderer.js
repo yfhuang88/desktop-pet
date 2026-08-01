@@ -19,7 +19,7 @@ function applyState(state) {
     sprite.src = src;
     lastSrc = src;
   }
-  sprite.style.transform = state.facingLeft ? 'scaleX(-1)' : 'scaleX(1)';
+  // 不再根据移动方向左右镜像翻转贴图，人物始终保持原朝向
 }
 
 function triggerJump() {
