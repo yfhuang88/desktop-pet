@@ -5,6 +5,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use rand::Rng;
 use serde::Serialize;
+use sysinfo::System;
 use tauri::{
     AppHandle, CustomMenuItem, Manager, PhysicalPosition, SystemTray, SystemTrayEvent,
     SystemTrayMenu, SystemTrayMenuItem, Window,
@@ -16,7 +17,8 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 // ------------------------- 可调参数(与 Electron 版保持一致) -------------------------
@@ -52,6 +54,11 @@ const DRAG_MAX_SPEED: f64 = 1400.0; // 拖拽时的最大跟随速度(px/秒)，
 // 这里特意留了约 15% 余量，抵消离散时间模拟(每帧16ms)带来的轻微超调风险。
 const DRAG_SPRING_K: f64 = 500.0; // 弹簧强度，越大跟手越紧、追得越快
 const DRAG_SPRING_DAMPING: f64 = 54.0; // 阻尼系数(临界值约为 2*sqrt(500)≈44.7)
+
+const STATS_WINDOW_WIDTH: f64 = 220.0; // 系统状态窗口宽度(px)，需与 tauri.conf.json 里 stats 窗口一致
+const STATS_WINDOW_HEIGHT: f64 = 140.0; // 系统状态窗口高度(px)，需与 tauri.conf.json 里 stats 窗口一致
+const STATS_GAP: f64 = 12.0; // 状态窗口与宠物本体之间的间隙(px)
+const STATS_REFRESH_INTERVAL_MS: u128 = 1000; // 系统状态(CPU/RAM/电量)刷新间隔(ms)
 // ------------------------------------------------------------------------------------
 
 #[derive(Clone, Copy, PartialEq)]
@@ -69,6 +76,15 @@ struct PetState {
     dragging: bool,
     facing_left: bool,
     frame: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct StatsPayload {
+    cpu_percent: f32,
+    ram_percent: f32,
+    battery_percent: Option<f32>,
+    on_ac_power: Option<bool>,
 }
 
 fn get_cursor_pos() -> (f64, f64) {
@@ -106,6 +122,49 @@ fn is_left_button_down() -> bool {
     unsafe { (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0 }
 }
 
+fn is_right_button_down() -> bool {
+    unsafe { (GetAsyncKeyState(VK_RBUTTON.0 as i32) as u16 & 0x8000) != 0 }
+}
+
+/// 读取电池电量(0-100)和是否接通电源；台式机等没有电池的设备返回 (None, None)
+fn read_power_status() -> (Option<f32>, Option<bool>) {
+    unsafe {
+        let mut status = SYSTEM_POWER_STATUS::default();
+        if GetSystemPowerStatus(&mut status).is_ok() {
+            // BatteryFlag == 128 表示"没有电池"(台式机)，BatteryLifePercent == 255 表示"未知"
+            if status.BatteryFlag == 128 || status.BatteryLifePercent == 255 {
+                (None, None)
+            } else {
+                (
+                    Some(status.BatteryLifePercent as f32),
+                    Some(status.ACLineStatus == 1),
+                )
+            }
+        } else {
+            (None, None)
+        }
+    }
+}
+
+/// 计算状态窗口应该贴在宠物哪一侧：优先贴右侧，放不下就贴左侧；
+/// 垂直方向与宠物窗口顶部对齐，并夹在当前显示器工作区内。
+fn stats_anchor_position(
+    pet_win_x: f64,
+    pet_win_y: f64,
+    area_x: f64,
+    area_y: f64,
+    area_w: f64,
+    area_h: f64,
+) -> (f64, f64) {
+    let mut sx = pet_win_x + WINDOW_SIZE + STATS_GAP;
+    if sx + STATS_WINDOW_WIDTH > area_x + area_w {
+        sx = pet_win_x - STATS_GAP - STATS_WINDOW_WIDTH;
+    }
+    let max_sy = (area_y + area_h - STATS_WINDOW_HEIGHT).max(area_y);
+    let sy = pet_win_y.max(area_y).min(max_sy);
+    (sx, sy)
+}
+
 fn rand_range(min: f64, max: f64) -> f64 {
     let mut rng = rand::thread_rng();
     min + rng.gen::<f64>() * (max - min)
@@ -120,6 +179,9 @@ fn now_ms() -> u128 {
 
 fn spawn_physics_loop(window: Window) {
     thread::spawn(move || {
+        let stats_window = window.get_window("stats").unwrap();
+        let mut sys = System::new_all();
+
         let (cx, cy) = get_cursor_pos();
         let (ax, ay, aw, ah) = work_area_for(cx, cy);
 
@@ -141,6 +203,13 @@ fn spawn_physics_loop(window: Window) {
         let mut press_start_cursor = (0.0_f64, 0.0_f64);
         let mut is_dragging = false;
         let mut drag_offset = (0.0_f64, 0.0_f64);
+
+        // 右键点击宠物弹出/收起系统状态窗口；判定方式与左键一致(按下时落在宠物身上才算数)，
+        // 但右键不需要区分"点击"和"长按拖拽"，松手就触发一次切换。
+        let mut mouse_was_down_right = false;
+        let mut right_press_active = false;
+        let mut stats_open = false;
+        let mut last_stats_emit_ms: u128 = 0;
 
         let mut escape_sample_cursor = (cx, cy);
         let mut escape_sample_time = now_ms();
@@ -223,6 +292,34 @@ fn spawn_physics_loop(window: Window) {
             }
             mouse_was_down = mouse_down_now;
 
+            // 右键点击切换系统状态窗口的显示/收起，判定逻辑跟左键点击一致：
+            // 按下时鼠标落在宠物身上才算"按在宠物上"，松手时才真正触发切换。
+            let mouse_down_now_right = is_right_button_down();
+            if mouse_down_now_right && !mouse_was_down_right && is_hovered {
+                right_press_active = true;
+            }
+            if !mouse_down_now_right && mouse_was_down_right {
+                if right_press_active {
+                    stats_open = !stats_open;
+                    if stats_open {
+                        let win_x_now = pet_x - WINDOW_SIZE / 2.0;
+                        let win_y_now = pet_y - WINDOW_SIZE / 2.0 - JUMP_SPACE;
+                        let (sx, sy) =
+                            stats_anchor_position(win_x_now, win_y_now, area_x, area_y, area_w, area_h);
+                        let _ = stats_window.set_position(tauri::Position::Physical(PhysicalPosition {
+                            x: sx.round() as i32,
+                            y: sy.round() as i32,
+                        }));
+                        let _ = stats_window.show();
+                        last_stats_emit_ms = 0; // 强制窗口一打开就立刻刷新一次数据
+                    } else {
+                        let _ = stats_window.hide();
+                    }
+                }
+                right_press_active = false;
+            }
+            mouse_was_down_right = mouse_down_now_right;
+
             if is_dragging {
                 // 拖拽中：用临界阻尼弹簧跟随"鼠标+抓取偏移"这个目标点，而不是
                 // "全速冲过去、快到了再刹车"。弹簧模型在任何距离下都同时有拉力
@@ -277,8 +374,8 @@ fn spawn_physics_loop(window: Window) {
                 let mut target_y = pet_y;
                 let mut should_seek = true;
 
-                if is_hovered {
-                    // 鼠标悬停在宠物身上，强制停下，不追逐任何目标
+                if is_hovered || stats_open {
+                    // 鼠标悬停在宠物身上，或系统状态窗口正打开着，强制停下，不追逐任何目标
                     should_seek = false;
                 } else {
                     match mode {
@@ -385,6 +482,43 @@ fn spawn_physics_loop(window: Window) {
                 x: (pet_x - WINDOW_SIZE / 2.0).round() as i32,
                 y: (pet_y - WINDOW_SIZE / 2.0 - JUMP_SPACE).round() as i32,
             }));
+
+            if stats_open {
+                // 宠物本身在状态窗口打开期间被冻结不动，但拖拽仍然允许移动它，
+                // 所以每帧都重新贴一次位置，跟着宠物(而不是只在打开那一刻定死)。
+                let win_x_now = pet_x - WINDOW_SIZE / 2.0;
+                let win_y_now = pet_y - WINDOW_SIZE / 2.0 - JUMP_SPACE;
+                let (sx, sy) =
+                    stats_anchor_position(win_x_now, win_y_now, clamp_x, clamp_y, clamp_w, clamp_h);
+                let _ = stats_window.set_position(tauri::Position::Physical(PhysicalPosition {
+                    x: sx.round() as i32,
+                    y: sy.round() as i32,
+                }));
+
+                let now = now_ms();
+                if now.saturating_sub(last_stats_emit_ms) >= STATS_REFRESH_INTERVAL_MS {
+                    last_stats_emit_ms = now;
+                    sys.refresh_cpu_usage();
+                    sys.refresh_memory();
+                    let cpu_percent = sys.global_cpu_usage();
+                    let total_mem = sys.total_memory();
+                    let ram_percent = if total_mem > 0 {
+                        (sys.used_memory() as f64 / total_mem as f64 * 100.0) as f32
+                    } else {
+                        0.0
+                    };
+                    let (battery_percent, on_ac_power) = read_power_status();
+                    let _ = stats_window.emit(
+                        "stats-update",
+                        StatsPayload {
+                            cpu_percent,
+                            ram_percent,
+                            battery_percent,
+                            on_ac_power,
+                        },
+                    );
+                }
+            }
 
             let now = now_ms();
             if now.saturating_sub(last_anim_time) >= ANIM_FRAME_INTERVAL_MS {

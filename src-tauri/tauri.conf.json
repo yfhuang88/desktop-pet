@@ -42,6 +42,19 @@
         "resizable": false,
         "skipTaskbar": true,
         "visible": false
+      },
+      {
+        "label": "stats",
+        "url": "stats.html",
+        "width": 220,
+        "height": 140,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false
       }
     ]
   }

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>System Stats</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  #panel {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    padding: 12px 14px;
+    background: rgba(24, 24, 28, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    color: #eaeaea;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+  }
+  .row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .row-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .row-label .name {
+    color: #b8b8b8;
+  }
+  .row-label .value {
+    font-weight: 600;
+  }
+  .bar-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+  }
+  /* 占位配色：这是功能占位样式，正式美术会替换整套视觉 */
+  .level-low .bar-fill { background: #4caf50; }
+  .level-low .value { color: #4caf50; }
+  .level-mid .bar-fill { background: #e0b93a; }
+  .level-mid .value { color: #e0b93a; }
+  .level-high .bar-fill { background: #e0523a; }
+  .level-high .value { color: #e0523a; }
+
+  #battery-row {
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <div id="panel">
+    <div class="row" id="cpu-row">
+      <div class="row-label"><span class="name">CPU</span><span class="value" id="cpu-value">--%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="cpu-bar"></div></div>
+    </div>
+    <div class="row" id="ram-row">
+      <div class="row-label"><span class="name">RAM</span><span class="value" id="ram-value">--%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="ram-bar"></div></div>
+    </div>
+    <div class="row" id="battery-row">
+      <div class="row-label"><span class="name" id="battery-name">电量</span><span class="value" id="battery-value">--%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="battery-bar"></div></div>
+    </div>
+  </div>
+  <script src="renderer_stats.js"></script>
+</body>
+</html>

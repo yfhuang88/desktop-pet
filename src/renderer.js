@@ -54,3 +54,7 @@ window.__TAURI__.event.listen('pet-state', (event) => {
 window.__TAURI__.event.listen('pet-jump', () => {
   triggerJump();
 });
+
+// 右键点宠物是"弹出/收起系统状态窗口"的触发方式(由后端判定并处理)，
+// 这里只需要拦掉浏览器默认的右键菜单，避免它盖住透明窗口。
+document.addEventListener('contextmenu', (e) => e.preventDefault());
