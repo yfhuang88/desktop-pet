@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Desktop Pet</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #pet {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: flex-end; /* 图片贴底部显示，顶部留出的空间用于点击弹跳 */
+    justify-content: center;
+  }
+  #pet-bounce {
+    display: flex;
+    justify-content: center;
+  }
+  #pet-bounce.jumping {
+    animation: pet-jump 0.4s;
+  }
+  @keyframes pet-jump {
+    0%   { transform: translateY(0); animation-timing-function: ease-out; }
+    45%  { transform: translateY(-42px); animation-timing-function: ease-in; }
+    100% { transform: translateY(0); }
+  }
+  #pet img {
+    /* 固定像素尺寸，保证素材显示大小不受顶部弹跳预留空间影响 */
+    max-width: 144px;
+    max-height: 153px;
+    image-rendering: pixelated;
+    -webkit-user-drag: none;
+    pointer-events: auto;
+  }
+</style>
+</head>
+<body>
+  <div id="pet">
+    <div id="pet-bounce">
+      <img id="pet-sprite" src="assets/idle.png" draggable="false" alt="pet" />
+    </div>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
