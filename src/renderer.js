@@ -37,10 +37,14 @@ bounce.addEventListener('animationend', () => {
   isJumping = false;
 });
 
-// 是否悬停/点击穿透完全由 Rust 后端根据鼠标是否落在宠物贴图范围内自动处理，
-// 前端只需要负责渲染当前状态，以及在真正收到点击时(说明鼠标确实在宠物身上)触发弹跳。
+// 是否悬停/点击穿透，以及"这是一次点击还是一次长按拖拽"，都由 Rust 后端
+// 统一判定(它同时掌握鼠标左键状态和光标位置)。前端只负责纯渲染：
+// 收到 pet-state 就更新贴图/朝向，收到 pet-jump 就播放弹跳动画。
+// 拖拽本身也完全由后端直接搬动窗口位置实现，前端不需要处理任何拖拽逻辑。
 window.__TAURI__.event.listen('pet-state', (event) => {
   applyState(event.payload);
 });
 
-sprite.addEventListener('click', triggerJump);
+window.__TAURI__.event.listen('pet-jump', () => {
+  triggerJump();
+});
