@@ -6,14 +6,20 @@ const FRAME_SRC = {
   walk1: 'assets/walk1.png',
   walk2: 'assets/walk2.png',
   walk3: 'assets/walk3.png',
+  drag: 'assets/drag.png',
 };
 
 let lastSrc = '';
 let isJumping = false;
 
 function applyState(state) {
-  // 弹跳期间固定显示 idle 素材，不被走路/站立状态更新打断
-  const srcKey = isJumping ? 'idle' : (state.walking ? state.frame : 'idle');
+  // 弹跳期间固定显示 idle 素材，不被走路/站立状态更新打断；
+  // 拖拽期间显示专属的 drag 素材，优先级低于弹跳、高于走路/待机。
+  const srcKey = isJumping
+    ? 'idle'
+    : state.dragging
+      ? 'drag'
+      : (state.walking ? state.frame : 'idle');
   const src = FRAME_SRC[srcKey];
   if (src !== lastSrc) {
     sprite.src = src;

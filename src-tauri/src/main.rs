@@ -66,6 +66,7 @@ enum Mode {
 #[serde(rename_all = "camelCase")]
 struct PetState {
     walking: bool,
+    dragging: bool,
     facing_left: bool,
     frame: &'static str,
 }
@@ -404,6 +405,7 @@ fn spawn_physics_loop(window: Window) {
                 "pet-state",
                 PetState {
                     walking: is_walking,
+                    dragging: is_dragging,
                     facing_left,
                     frame,
                 },

@@ -80,5 +80,5 @@ Pet_Tauri/
 
 ## 想换个角色贴图/调参数
 
-- 直接替换 `src/assets/` 下的 4 张图（文件名必须是 `idle.png` / `walk1.png` / `walk2.png` / `walk3.png`），如果新素材的像素尺寸跟原来的 120x165 差异较大，需要同步调整 `src-tauri/src/main.rs` 顶部的 `SPRITE_W` / `SPRITE_H`，以及 `src/index.html` 里 `#pet img` 的 `max-width` / `max-height`。
+- 直接替换 `src/assets/` 下的 5 张图（文件名必须是 `idle.png` / `walk1.png` / `walk2.png` / `walk3.png` / `drag.png`，其中 `drag.png` 是长按拖拽时显示的专属贴图），如果新素材的像素尺寸跟原来的 120x165 差异较大，需要同步调整 `src-tauri/src/main.rs` 顶部的 `SPRITE_W` / `SPRITE_H`，以及 `src/index.html` 里 `#pet img` 的 `max-width` / `max-height`。
 - 跟随速度、停靠距离、甩开判定、待机/溜达时间等所有行为参数都集中在 `src-tauri/src/main.rs` 文件最上面的常量区，改完用 `npm run build` 重新编译即可。
