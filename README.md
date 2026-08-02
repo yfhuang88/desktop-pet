@@ -23,7 +23,7 @@ src-tauri/target/release/DesktopPet.exe
 
 - 窗口透明、无边框、始终置顶，只显示宠物本体
 - 缓慢跟随鼠标移动（有加速度，不是瞬移），靠近后停在鼠标侧边（不挡住鼠标指向的内容），并转身看向鼠标
-- 移动时播放走路动画，朝向随移动方向左右翻转
+- 移动时播放走路动画（人物朝向固定，不会镜像翻转）
 - 点击宠物本体会往上弹一下
 - 鼠标悬停在宠物身上时会停下，不再追逐
 - 鼠标快速甩远（或距离拉得够远）时，宠物会放弃追逐，走回屏幕底部待机；待机一阵子后会慢悠悠地左右溜达，如此循环；鼠标靠近时会重新开始追逐
@@ -49,6 +49,15 @@ src-tauri/target/release/DesktopPet.exe
 3. 按下鼠标那一刻，只有排在最上层的那个才真正响应，其余的让位。
 
 这几步涉及一块全新的 Win32 窗口层级查询代码，加上一套需要严格保证"跟手"（不能有延迟，不然会出现两边都不响应的空档）的跨进程实时状态同步，改动范围和风险都不小；而且"避免重叠"这个功能已经让宠物静止时自然分开了，真正会撞上"贴图本体完全重叠"的场景本来就很少见（基本只发生在故意把一个直接拖到另一个正上方的时候）。综合下来判断投入产出比不高，先记录在这里，不实现。
+
+## 分支说明
+
+这个仓库有几个并行分支，功能范围不完全一样：
+
+- **main**：主线分支，功能最全，持续在这个基础上继续开发。
+- **baseline-simple**（当前分支）：跟 main 保持功能同步的精简版本，专门用来分享给不需要额外功能（自定义皮肤、系统状态弹窗等）的朋友；目前和 main 完全一致。
+- **feature/customizable-assets**：在 main 的基础上，加了"不用重新编译，直接换 exe 旁边 assets 文件夹里的图就能换皮肤"的功能。
+- **feature/system-stats**：在 main 的基础上，加了"右键宠物弹出 CPU/内存/电量小窗口"的功能；这个分支还没同步最新的多开防重叠、按像素精确点击判定、边界卡死修复这些改动，功能上暂时落后于 main。
 
 ## 开发环境搭建
 
@@ -83,9 +92,13 @@ Pet_Tauri/
 ├── src/                     前端(窗口内容)
 │   ├── index.html
 │   ├── renderer.js
-│   └── assets/              四张宠物素材(idle/walk1/walk2/walk3.png)
+│   └── assets/              五张宠物素材(idle/walk1/walk2/walk3/drag.png)
 ├── src-tauri/                Rust 后端
-│   ├── src/main.rs           窗口管理、跟随鼠标的物理运动、点击穿透、托盘、状态机
+│   ├── src/main.rs           入口/托盘/窗口装配，不含具体逻辑
+│   ├── src/physics.rs        核心状态机：追逐/待机/溜达/拖拽/跳跃
+│   ├── src/input.rs          底层 Win32 输入/显示器信息读取
+│   ├── src/instances.rs      多开互不重叠用的共享位置登记表
+│   ├── src/util.rs           零散小工具函数
 │   ├── tauri.conf.json       窗口/托盘/图标配置
 │   ├── icons/                应用图标(由 idle.png 生成)
 │   └── target/release/       编译产物(DesktopPet.exe 在这里)
@@ -95,5 +108,5 @@ Pet_Tauri/
 
 ## 想换个角色贴图/调参数
 
-- 直接替换 `src/assets/` 下的 5 张图（文件名必须是 `idle.png` / `walk1.png` / `walk2.png` / `walk3.png` / `drag.png`，其中 `drag.png` 是长按拖拽时显示的专属贴图），如果新素材的像素尺寸跟原来的 120x165 差异较大，需要同步调整 `src-tauri/src/main.rs` 顶部的 `SPRITE_W` / `SPRITE_H`，以及 `src/index.html` 里 `#pet img` 的 `max-width` / `max-height`。
-- 跟随速度、停靠距离、甩开判定、待机/溜达时间等所有行为参数都集中在 `src-tauri/src/main.rs` 文件最上面的常量区，改完用 `npm run build` 重新编译即可。
+- 直接替换 `src/assets/` 下的 5 张图（文件名必须是 `idle.png` / `walk1.png` / `walk2.png` / `walk3.png` / `drag.png`，其中 `drag.png` 是长按拖拽时显示的专属贴图），如果新素材的像素尺寸跟原来的 120x165 差异较大，需要同步调整 `src-tauri/src/physics.rs` 顶部的 `SPRITE_W` / `SPRITE_H`，以及 `src/index.html` 里 `#pet img` 的 `max-width` / `max-height`。
+- 跟随速度、停靠距离、甩开判定、待机/溜达时间等所有行为参数都集中在 `src-tauri/src/physics.rs` 文件最上面的常量区，改完用 `npm run build` 重新编译即可。
