@@ -535,6 +535,7 @@ dependencies = [
 name = "desktop-pet-tauri"
 version = "1.0.0"
 dependencies = [
+ "image",
  "rand 0.8.7",
  "serde",
  "serde_json",
@@ -1375,6 +1376,7 @@ dependencies = [
  "byteorder",
  "color_quant",
  "num-traits",
+ "png",
 ]
 
 [[package]]
