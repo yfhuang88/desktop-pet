@@ -55,7 +55,7 @@ src-tauri/target/release/DesktopPet.exe
 这个仓库有几个并行分支，功能范围不完全一样：
 
 - **main**：主线分支，功能最全，持续在这个基础上继续开发。
-- **baseline-simple**（当前分支）：跟 main 保持功能同步的精简版本，专门用来分享给不需要额外功能（自定义皮肤、系统状态弹窗等）的朋友；目前和 main 完全一致。
+- **baseline-simple**：跟 main 保持功能同步的精简版本，专门用来分享给不需要额外功能（自定义皮肤、系统状态弹窗等）的朋友；目前和 main 完全一致。
 - **feature/customizable-assets**：在 main 的基础上，加了"不用重新编译，直接换 exe 旁边 assets 文件夹里的图就能换皮肤"的功能。
 - **feature/system-stats**：在 main 的基础上，加了"右键宠物弹出 CPU/内存/电量小窗口"的功能；这个分支还没同步最新的多开防重叠、按像素精确点击判定、边界卡死修复这些改动，功能上暂时落后于 main。
 
