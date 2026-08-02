@@ -31,6 +31,7 @@ src-tauri/target/release/DesktopPet.exe
 - 系统托盘图标：右键菜单"隐藏/显示"、"退出"；左键单击图标快速隐藏/显示
 - 窗口对鼠标点击穿透（除了宠物本体所在的一小块区域，而且是按贴图实际不透明的像素判定，不是简单的矩形范围），不影响操作桌面其他内容
 - 支持同时打开多个实例：静止(待机/追逐停靠/溜达/拖拽落地)时会自动互相避开，不会叠在同一个点上；移动/溜达途中完全不受影响，可以自由地互相穿过、擦肩而过
+- 不用重新编译，直接在 exe 旁边放一个 assets 文件夹就能换角色贴图，见下面"换皮肤不用重新编译"一节
 
 ## 已知问题：拖到另一块屏幕过不去
 
@@ -56,7 +57,7 @@ src-tauri/target/release/DesktopPet.exe
 
 - **main**：主线分支，功能最全，持续在这个基础上继续开发。
 - **baseline-simple**：跟 main 保持功能同步的精简版本，专门用来分享给不需要额外功能（自定义皮肤、系统状态弹窗等）的朋友；目前和 main 完全一致。
-- **feature/customizable-assets**：在 main 的基础上，加了"不用重新编译，直接换 exe 旁边 assets 文件夹里的图就能换皮肤"的功能。
+- **feature/customizable-assets**：原本用来试验"不用重新编译换皮肤"这个功能，现在这个功能已经并入 main/baseline-simple，这个分支暂时保留（待确认是否还需要单独存在）。
 - **feature/system-stats**：在 main 的基础上，加了"右键宠物弹出 CPU/内存/电量小窗口"的功能；这个分支还没同步最新的多开防重叠、按像素精确点击判定、边界卡死修复这些改动，功能上暂时落后于 main。
 
 ## 开发环境搭建
@@ -98,7 +99,9 @@ Pet_Tauri/
 │   ├── src/physics.rs        核心状态机：追逐/待机/溜达/拖拽/跳跃
 │   ├── src/input.rs          底层 Win32 输入/显示器信息读取
 │   ├── src/instances.rs      多开互不重叠用的共享位置登记表
+│   ├── src/skin.rs           运行时自定义素材 + 托盘图标同步
 │   ├── src/util.rs           零散小工具函数
+│   ├── 使用说明.txt           面向最终用户的说明(自动复制到 exe 旁边)
 │   ├── tauri.conf.json       窗口/托盘/图标配置
 │   ├── icons/                应用图标(由 idle.png 生成)
 │   └── target/release/       编译产物(DesktopPet.exe 在这里)
@@ -110,3 +113,33 @@ Pet_Tauri/
 
 - 直接替换 `src/assets/` 下的 5 张图（文件名必须是 `idle.png` / `walk1.png` / `walk2.png` / `walk3.png` / `drag.png`，其中 `drag.png` 是长按拖拽时显示的专属贴图），如果新素材的像素尺寸跟原来的 120x165 差异较大，需要同步调整 `src-tauri/src/physics.rs` 顶部的 `SPRITE_W` / `SPRITE_H`，以及 `src/index.html` 里 `#pet img` 的 `max-width` / `max-height`。
 - 跟随速度、停靠距离、甩开判定、待机/溜达时间等所有行为参数都集中在 `src-tauri/src/physics.rs` 文件最上面的常量区，改完用 `npm run build` 重新编译即可。
+
+## 换皮肤不用重新编译：exe 旁边放一个 assets 文件夹
+
+不想动代码、也不想装开发环境的话，可以直接在 `DesktopPet.exe` **同一个文件夹**里新建一个 `assets` 文件夹，把想用的图片放进去，文件名必须是：
+
+```
+DesktopPet.exe
+assets/
+  idle.png
+  walk1.png
+  walk2.png
+  walk3.png
+  drag.png
+```
+
+不需要 5 张全部提供，规则是：
+
+- 一张自定义图都没放 → 用回内置默认的图
+- 放了 `idle.png`，但 walk 图不全或者一张都没放 → 站立用你的 `idle.png`；走路状态固定显示你放的 walk 图里编号最小的那张（没有的话就用 `idle.png` 顶上），不会有循环走路动画
+- `walk1/2/3.png` 三张都放齐了 → 走路动画正常循环播放这三张
+- 没放 `idle.png`，但放了 walk 图 → 站立状态也会用你放的 walk 图里编号最小的那张顶上
+- `drag.png` 是长按拖拽时显示的专属贴图，没放的话会直接沿用 idle 那张（不管 idle 本身是自定义还是内置默认）
+
+系统托盘图标也会跟着换成同一张"身份"图片（优先用你的 `idle.png`，没有就用编号最小的 walk 图），非正方形的图会自动缩放并居中贴到方形图标里，不会被拉伸变形。
+
+这些都只在**启动时**判定一次——运行过程中改动 `assets` 文件夹里的图片不会立即生效，需要重新启动才能看到变化。
+
+图片大小没有限制，多大的图都能放，只是解码后如果边长超过 512px 会被自动等比缩小，所以没必要专门传特别大的图。
+
+（这套"外部 assets 文件夹优先，缺什么就用现有的凑，图不全也不强制回退默认图"的逻辑在 `src-tauri/src/skin.rs` 的 `resolve_skin_config` 函数里，想改判定规则改这里就行。`assets_root()`/`load_external_as_data_url()` 是特意公开出来的通用零件，以后别的功能想有自己的一套可自定义素材，可以直接复用这两个函数，不需要改这个文件。）

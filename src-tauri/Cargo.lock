@@ -535,6 +535,7 @@ dependencies = [
 name = "desktop-pet-tauri"
 version = "1.0.0"
 dependencies = [
+ "base64 0.21.7",
  "image",
  "rand 0.8.7",
  "serde",
