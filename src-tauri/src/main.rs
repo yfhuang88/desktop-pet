@@ -3,6 +3,7 @@
 mod input;
 mod instances;
 mod physics;
+mod skin;
 mod util;
 
 use tauri::{
@@ -59,9 +60,12 @@ fn main() {
             },
             _ => {}
         })
+        .invoke_handler(tauri::generate_handler![skin::get_skin_config])
         .setup(|app| {
+            skin::sync_tray_icon(&app.handle());
+
             let window = app.get_window("main").unwrap();
-            // baseline-simple 是纯核心版本，不接任何功能扩展。
+            // 素材自定义只在启动时判定一次，不需要每帧介入，所以不用挂 PetExtension。
             physics::spawn_physics_loop(window, vec![]);
             Ok(())
         })

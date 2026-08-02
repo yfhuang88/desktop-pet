@@ -415,6 +415,18 @@ pub fn spawn_physics_loop(window: Window, mut extensions: Vec<Box<dyn PetExtensi
                     }
                 }
 
+                // 追逐鼠标时，目标点直接就是鼠标(侧边偏移后的)坐标，但鼠标可能停在
+                // 宠物物理上够不到的地方(屏幕最顶/底那一小段，因为有 JUMP_SPACE 和
+                // 半个窗口宽度的边界限制)。到达判定要用"宠物实际够得到的位置"来算，
+                // 不然距离永远大于 STOP_DISTANCE，会一直卡在边界原地全速"用力"、
+                // 走路动画也停不下来。这里把目标点也提前钳制到跟宠物本体同样的范围。
+                target_x = target_x
+                    .max(area_x + WINDOW_SIZE / 2.0)
+                    .min(area_x + area_w - WINDOW_SIZE / 2.0);
+                target_y = target_y
+                    .max(area_y + WINDOW_SIZE / 2.0 + JUMP_SPACE)
+                    .min(area_y + area_h - WINDOW_SIZE / 2.0);
+
                 let dx = target_x - pet_x;
                 let dy = target_y - pet_y;
                 let dist = dx.hypot(dy);

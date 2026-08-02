@@ -1,6 +1,10 @@
 const sprite = document.getElementById('pet-sprite');
 const bounce = document.getElementById('pet-bounce');
 
+// 先用内置默认图占位，等下面的 get_skin_config 调用返回后，
+// 如果 exe 同目录 assets/ 文件夹里有自定义图片，会直接覆盖这几个字段的值。
+// 之后的每一帧 applyState 都会重新从这个表里取值，所以覆盖会在下一帧自动生效，
+// 不需要额外的"刷新"逻辑。
 const FRAME_SRC = {
   idle: 'assets/idle.png',
   walk1: 'assets/walk1.png',
@@ -8,6 +12,14 @@ const FRAME_SRC = {
   walk3: 'assets/walk3.png',
   drag: 'assets/drag.png',
 };
+
+window.__TAURI__.tauri.invoke('get_skin_config').then((config) => {
+  FRAME_SRC.idle = config.idleSrc;
+  FRAME_SRC.walk1 = config.walk1Src;
+  FRAME_SRC.walk2 = config.walk2Src;
+  FRAME_SRC.walk3 = config.walk3Src;
+  FRAME_SRC.drag = config.dragSrc;
+});
 
 let lastSrc = '';
 let isJumping = false;
